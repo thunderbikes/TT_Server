@@ -1,13 +1,11 @@
-name: demo
+name: TT_Server
 version: 0.1.0
 
 authors:
-  - Peter Woolsey <woolsey@student.ubc.ca>
+  - ThunderBikes Design Team <thunderbikes@gmail.com>
 
 targets:
   demo:
-    main: src/demo.cr
+    main: src/main.cr
 
 crystal: 1.7.0
-
-license: MIT
