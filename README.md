@@ -1,26 +1,25 @@
 # TT Server
-Server for Thunder Track
-
+Server for Thunder Track  
+Most information about Thunder Track (APIs, return structures etc.) will be stored here
+  
 ## TODO:
-
-
-
+  
 ## API Structure
 
 ### /version
--> "Version ID
+-> "Version ID"   
 
 ### /add/{id}/
-->same thing back?
-    -> if message is not returned keep sending
+if the code is in the dictionary  -> return number
+else -> return "Invalud
 
-### /delete/{id}/
-->same thing back
-    -> if message is not returned keep sending
+### /remove/{id}/
+if it was an error -> return number
+else -> return "Invalid"
 
 ### /get
 if no errors:
--> {nil}
+-> {} (in Ruby this returns nil)
 else:
 -> error json structure:
 
@@ -28,7 +27,7 @@ else:
 {
     "1234": {
         "description" : "overcurrent",
-        "time": 12134,
+        "time": 12134, 
         "urgency": 0,            
         "area": "BMS"
     },
@@ -40,5 +39,4 @@ else:
     }
 }
 ```
-
-For time, maybe server takes when server gets the error, seconds since start of day UTC?
+The time is UNIX epoch (seconds) (UTC)

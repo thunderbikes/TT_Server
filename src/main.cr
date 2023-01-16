@@ -1,10 +1,46 @@
-# TODO: Write documentation for `Demo`
 PORT = 8080
 require "http/server"
 require "json"
-module Demo
+module Main
   VERSION = "0.1.0"
-  # initialized values of empty (always starts with )
+
+  class Entry
+    def initialize(description : String, urgency : Int32, area : String)
+      @description = description
+      @urgency = urgency
+      @area = area
+    end
+
+    def description
+      return @description
+    end
+
+    def urgency
+      return @urgency
+    end
+
+    def area
+      return @area
+    end
+  end
+
+  class Dictionary
+    def initialize()
+      @dictionary = Hash(Int32, Entry).new
+    end
+
+    def add_word(code : Int32, definition : Entry)
+      @dictionary[code] = definition
+    end
+
+    def remove(code : Int32)
+      @dictionary.delete(code)
+    end
+
+    def get_entry(code : Int32)
+      return @dictionary[code]?
+    end
+  end
 
   class Error
     def initialize(description : String, time : Int64, urgency : Int32, area : String)
@@ -13,15 +49,19 @@ module Demo
       @urgency = urgency
       @area = area
     end
+
     def description
       return @description
     end
+    
     def time
       return @time
     end
+    
     def urgency
       return @urgency
     end
+    
     def area
       return @area
     end
@@ -31,12 +71,19 @@ module Demo
     def initialize()
       @errors = Hash(Int32, Error).new
     end
+
     def add_error(number : Int32, error : Error)
       @errors[number] = error
     end
+
     def remove(number : Int32)
+      if @errors[number].nil?
+        return nil
+      end
       @errors.delete(number)
+      return number
     end
+
     def make_json()
       return JSON.build do |json|
         #json.field("errors") do
@@ -51,36 +98,63 @@ module Demo
                 end
               end
             end
-          end
-        #end
-        #json.field("timestamp", 123) #fix with Time library
+        end
       end
     end
   end
 
+
+  error_dictionary = Dictionary.new
+  # set up error 1
+  error_1 = Entry.new(description: "overcurrent", urgency: 0, area: "BMS")
+  error_dictionary.add_word(1, error_1)
+  error_2 = Entry.new(description: "overtemp", urgency: 0, area: "Motor")
+  error_dictionary.add_word(2, error_2)
+  error_3 = Entry.new(description: "overvoltage", urgency: 0, area: "BMS")
+  error_dictionary.add_word(3, error_3)
+    
   data = Data.new
-  data.add_error(123, Error.new(description: "overcurrent", time: 12134, urgency: 0, area: "BMS"))
-  data.add_error(1, Error.new(description: "overcurrent", time: 12134, urgency: 0, area: "BMS"))
-  data.add_error(23, Error.new(description: "overcurrent", time: 12134, urgency: 0, area: "BMS"))
-  data.remove(1)
+  #data.add_error(123, Error.new(description: "overcurrent", time: 12134, urgency: 0, area: "BMS"))
+  #data.add_error(1, Error.new(description: "overcurrent", time: 12134, urgency: 0, area: "BMS"))
+  #data.add_error(23, Error.new(description: "overcurrent", time: 12134, urgency: 0, area: "BMS"))
+  #data.remove(1)
 
 
   server = HTTP::Server.new do |context|
-    context.response.content_type = "text/plain"
+    
     current_path = context.request.path.lchop
     command = current_path.split("/").first #this will need to be fixed when adding the set command
     case(command)
 
     when "version"
+      context.response.content_type = "text/plain"
       context.response.print VERSION
 
     when "get"
       context.response.content_type = "application/json"
       context.response.print data.make_json
 
-    when "set"
-      context.response.content_type = "application/json"
-      context.response.print "#{current_path}"
+    when "add"
+      input_code = current_path.split("/").last.to_i
+      error = error_dictionary.get_entry(input_code)
+      if error.nil?
+        context.response.content_type = "text/plain"
+        context.response.print "Invalid"
+      else 
+        data.add_error(input_code, Error.new(description: error.description, time: Time.utc.to_unix, urgency: error.urgency, area: error.area))
+        context.response.content_type = "text/plain"
+        context.response.print "#{input_code}"
+      end
+    when "remove"
+      input_code = current_path.split("/").last.to_i
+      removed = data.remove(input_code)
+      if removed.nil?
+        context.response.content_type = "text/plain"
+        context.response.print "Invalid"
+      else
+        context.response.content_type = "text/plain"
+        context.response.print "#{removed}"
+      end
     else
       context.response.print "Unexpected command: #{command}"
     end
