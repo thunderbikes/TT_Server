@@ -2,12 +2,6 @@ use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::sync::{Arc, Mutex};
 
-use hyper::{Body, Method, Request, Response, Server, StatusCode};
-use hyper::rt::Future;
-use hyper::service::service_fn;
-
-use hyper::rt::run;
-
 #[derive(Debug)]
 struct Entry {
     description: String,
@@ -70,6 +64,22 @@ impl Error {
             area,
         }
     }
+    fn from_entry(input: Entry) -> Self {
+        let time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
+        let description = input.description;
+        let urgency = input.urgency;
+        let area = input.area;
+        Self {
+            description,
+            time,
+            urgency,
+            area,
+        }
+    }
 }
 
 struct Data {
@@ -83,8 +93,8 @@ impl Data {
         }
     }
 
-    fn add_error(&mut self, number: i32, error: Error) {
-        self.errors.insert(number, error);
+    fn add_error(&mut self, error: Error) {
+        self.errors.insert(self.errors.len() as i32 + 1, error);
     }
 
     fn remove_error(&mut self, number: i32) -> Option<Error> {
@@ -124,60 +134,18 @@ fn main() {
     let data = Arc::new(Mutex::new(Data::new()));
     let dictionary = Arc::new(Mutex::new(error_dictionary));
 
-    let addr = ([127, 0, 0, 1], 3000).into();
+    
+    println!("{}",data.lock().unwrap().make_json());
+    
+    let test_error = dictionary.lock().unwrap().remove_entry(1).unwrap();
+    data.lock().unwrap().add_error(Error::from_entry(test_error));
+    println!("{}",data.lock().unwrap().make_json());
+    
+    let test_error = dictionary.lock().unwrap().remove_entry(2).unwrap();
+    data.lock().unwrap().add_error(Error::from_entry(test_error));
+    println!("{}",data.lock().unwrap().make_json());
 
-    let server = Server::bind(&addr)
-        .serve(move || {
-            let data = data.clone();
-            let dictionary = dictionary.clone();
-            service_fn(move |req| {
-                let method = req.method().clone();
-                let data = data.clone();
-                let dictionary = dictionary.clone();
-                let mut response = Response::new(Body::empty());
-                match (method, req.uri().path()) {
-                    (Method::POST, "/errors") => {
-                        let mut data = data.lock().unwrap();
-                        let mut dictionary = dictionary.lock().unwrap();
-                        let body = hyper::body::to_bytes(req.into_body())
-                            .wait()
-                            .unwrap();
-                        let body_str = String::from_utf8(body.to_vec()).unwrap();
-                        let error_number: i32 = body_str.trim().parse().unwrap();
-                        let entry = dictionary.get_entry(error_number).unwrap();
-                        let error = Error::new(entry.description.clone(), entry.urgency
-                            , entry.area.clone());
-                        data.add_error(error_number, error);
-                        *response.status_mut() = StatusCode::OK;
-                    },
-                    (Method::DELETE, "/errors") => {
-                        let mut data = data.lock().unwrap();
-                        let body = hyper::body::to_bytes(req.into_body())
-                            .wait()
-                            .unwrap();
-                        let body_str = String::from_utf8(body.to_vec()).unwrap();
-                        let error_number: i32 = body_str.trim().parse().unwrap();
-                        if let Some(error) = data.remove_error(error_number) {
-                            let mut dictionary = dictionary.lock().unwrap();
-                            dictionary.remove_entry(error_number);
-                            *response.status_mut() = StatusCode::OK;
-                        } else {
-                            *response.status_mut() = StatusCode::NOT_FOUND;
-                        }
-                    },
-                    (Method::GET, "/errors") => {
-                        let data = data.lock().unwrap();
-                        let json_str = data.make_json();
-                        *response.body_mut() = Body::from(json_str);
-                        *response.status_mut() = StatusCode::OK;
-                    },
-                    _ => {
-                        *response.status_mut() = StatusCode::NOT_FOUND;
-                    },
-                }
-                future::ok(response)
-            })
-        })
-        .map_err(|e| eprintln!("server error: {}", e));
+    data.lock().unwrap().remove_error(1);
+    println!("{}",data.lock().unwrap().make_json());
     }
 
